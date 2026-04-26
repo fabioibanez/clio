@@ -2,6 +2,7 @@ import subprocess
 
 
 def call_tool(args: dict) -> dict:
+    print(f"Calling tool: {args}")
     command = args["command"]
     timeout = args.get("timeout", 30)
 

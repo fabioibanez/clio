@@ -34,7 +34,7 @@ TOOLS = [
 ]
 
 
-class clio:
+class Clio:
     def __init__(self):
         self.client = anthropic.Anthropic()
         self.messages = []
@@ -43,20 +43,22 @@ class clio:
     def _call_tools(self, tool_uses: list[dict]) -> list[dict]:
         tool_results = []
         for tool in tool_uses:
-            result = tools.call_tool(tool)
-            tool_results.append(result)
+            result = tools.call_tool(tool.input)
+            tool_results.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tool.id,
+                    "content": json.dumps(result),
+                },
+            )
         return tool_results
-
-    # want to understand the format of the content first
-    def _add_to_context(self, role: str, content):
-        pass
 
     def run(self):
         while True:
             try:
                 user_input = input(f"{YOU_COLOR}> {RESET_COLOR}").strip()
             except KeyboardInterrupt:
-                print(f"{RESET_COLOR}\ 再见, goodbye, adiós")
+                print(f"{RESET_COLOR}\n\n再见, goodbye, adiós")
                 break
 
             if user_input in {"exit", "quit"}:
@@ -75,13 +77,12 @@ class clio:
                     tools=self.tools,
                 )
 
-                # add to context
-                self.messages.append({"role": "assistant", "content": response.content})
                 tool_uses = [
                     block for block in response.content if block.type == "tool_use"
                 ]
+                self.messages.append({"role": "assistant", "content": response.content})
+
                 if not tool_uses:
-                    # simply print the response
                     print(
                         f"{ASSISTANT_COLOR}"
                         + "\n".join(
@@ -89,16 +90,17 @@ class clio:
                             for block in response.content
                             if block.type == "text"
                         )
+                        + RESET_COLOR
                     )
                     break
 
-                tool_result = self._call_tools(tool_uses)
+                tool_results = self._call_tools(tool_uses)
 
-                self.messages.append({"role": "user", "content": tool_result})
+                self.messages.append({"role": "user", "content": tool_results})
 
 
 def main():
-    agent = clio()
+    agent = Clio()
     agent.run()
 
 
