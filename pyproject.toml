@@ -1,0 +1,14 @@
+[project]
+name = "clio"
+version = "0.1.0"
+description = "A stupid-simple extensible cli agent"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic>=0.97.0",
+]
+[project.scripts]
+clio = "clio:main"
+
+[tool.uv]
+package = true
