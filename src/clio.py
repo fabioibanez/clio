@@ -1,9 +1,14 @@
 import anthropic
 import json
 import tools
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
+
+YOU_COLOR = "\u001b[94m"
+ASSISTANT_COLOR = "\u001b[93m"
+RESET_COLOR = "\u001b[0m"
 
 TOOLS = [
     {
@@ -29,57 +34,72 @@ TOOLS = [
 ]
 
 
-def main():
-    """
-    This is the entrypoint for the agent loop
-    """
-    client = anthropic.Anthropic()
-    messages = []
+class clio:
+    def __init__(self):
+        self.client = anthropic.Anthropic()
+        self.messages = []
+        self.tools = TOOLS
 
-    while True:
-        user_input = input("> ").strip()
-        if user_input in {"exit", "quit"}:
-            break
+    def _call_tools(self, tool_uses: list[dict]) -> list[dict]:
+        tool_results = []
+        for tool in tool_uses:
+            result = tools.call_tool(tool)
+            tool_results.append(result)
+        return tool_results
 
-        messages.append({"role": "user", "content": user_input})
+    # want to understand the format of the content first
+    def _add_to_context(self, role: str, content):
+        pass
 
+    def run(self):
         while True:
-            response = client.messages.create(
-                model="claude-haiku-4-5",
-                max_tokens=1024,
-                messages=messages,
-                tools=TOOLS,
-            )
-
-            messages.append({"role": "assistant", "content": response.content})
-
-            tool_uses = [
-                block for block in response.content if block.type == "tool_use"
-            ]
-            if not tool_uses:
-                print(
-                    "\n".join(
-                        block.text for block in response.content if block.type == "text"
-                    )
-                )
+            try:
+                user_input = input(f"{YOU_COLOR}> {RESET_COLOR}").strip()
+            except KeyboardInterrupt:
+                print(f"{RESET_COLOR}\ 再见, goodbye, adiós")
                 break
 
-            tool_results = []
-            for tool_use in tool_uses:
-                if tool_use.name != "bash":
-                    result = {"error": f"Unknown tool: {tool_use.name}"}
-                else:
-                    result = tools.call_tool(tool_use.input)
+            if user_input in {"exit", "quit"}:
+                print(f"{RESET_COLOR}If you want to dip, please ctrl+c")
+                time.sleep(1)
+                continue
 
-                tool_results.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": tool_use.id,
-                        "content": json.dumps(result),
-                    }
+            self.messages.append({"role": "user", "content": user_input})
+
+            # tool calling loop
+            while True:
+                response = self.client.messages.create(
+                    model="claude-haiku-4-5",
+                    max_tokens=1024,
+                    messages=self.messages,
+                    tools=self.tools,
                 )
 
-            messages.append({"role": "user", "content": tool_results})
+                # add to context
+                self.messages.append({"role": "assistant", "content": response.content})
+                tool_uses = [
+                    block for block in response.content if block.type == "tool_use"
+                ]
+                if not tool_uses:
+                    # simply print the response
+                    print(
+                        f"{ASSISTANT_COLOR}"
+                        + "\n".join(
+                            block.text
+                            for block in response.content
+                            if block.type == "text"
+                        )
+                    )
+                    break
+
+                tool_result = self._call_tools(tool_uses)
+
+                self.messages.append({"role": "user", "content": tool_result})
+
+
+def main():
+    agent = clio()
+    agent.run()
 
 
 if __name__ == "__main__":
