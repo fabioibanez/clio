@@ -1,8 +1,19 @@
 import subprocess
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+# Characters kept per stream before a truncation notice is appended.
+MAX_OUTPUT_CHARS = 8_000
+
+
+def _truncate(text: str, label: str) -> str:
+    """Return *text* trimmed to MAX_OUTPUT_CHARS with a clear notice if cut."""
+    if len(text) <= MAX_OUTPUT_CHARS:
+        return text
+    kept = text[:MAX_OUTPUT_CHARS]
+    dropped = len(text) - MAX_OUTPUT_CHARS
+    return f"{kept}\n[{label} truncated — {dropped} additional characters not shown]"
 
 
 def call_tool(args: dict) -> dict:
@@ -22,14 +33,14 @@ def call_tool(args: dict) -> dict:
         return {
             "command": command,
             "exit_code": None,
-            "stdout": exc.stdout or "",
-            "stderr": exc.stderr or "",
+            "stdout": _truncate(exc.stdout or "", "stdout"),
+            "stderr": _truncate(exc.stderr or "", "stderr"),
             "error": f"Command, {command}, timed out after {timeout} seconds.",
         }
 
     return {
         "command": command,
         "exit_code": result.returncode,
-        "stdout": result.stdout,
-        "stderr": result.stderr,
+        "stdout": _truncate(result.stdout, "stdout"),
+        "stderr": _truncate(result.stderr, "stderr"),
     }
