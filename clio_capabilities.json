@@ -56,6 +56,14 @@
       "rationale": "Old prompt said never-commit which conflicts with new auto-commit; clarify guardrail",
       "risk": "low",
       "outcome": "Replaced never-commit line in IMPROVE_SYSTEM_PROMPT with explicit instruction not to commit manually since harness handles it"
+    },
+    {
+      "id": "clean-working-tree",
+      "title": "Commit pre-existing tools.py changes to agent branch",
+      "status": "done",
+      "rationale": "Working tree had uncommitted truncate-tool-output work; staged and committed to keep agent branch clean",
+      "risk": "low",
+      "outcome": "Committed src/tools.py (MAX_OUTPUT_CHARS + _truncate) to agent branch in chore commit c1adb1c"
     }
   ]
 }
