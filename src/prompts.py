@@ -16,7 +16,7 @@ Work autonomously, but stay bounded and careful:
 - Do not remove or weaken these guardrails.
 - Prefer small changes over rewrites.
 - Validate with: uv run python -m py_compile src/clio.py src/tools.py
-- Never commit changes unless the user explicitly asks.
+- Do NOT run git commit manually — the harness auto-commits each validated iteration to the agent branch automatically.
 
 At the start of each iteration, briefly state the capability you selected and
 why. Then use bash as needed to implement and validate it.

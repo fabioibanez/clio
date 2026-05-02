@@ -48,6 +48,14 @@
       "rationale": "Richer commit history makes it easy to review what each iteration changed",
       "risk": "low",
       "outcome": "Added pathlib import; _auto_commit() now writes subject + diff-stat body to /tmp/clio_commit_msg.txt and uses git commit -F"
+    },
+    {
+      "id": "update-improve-prompt",
+      "title": "Update IMPROVE_SYSTEM_PROMPT to reflect auto-commit behaviour",
+      "status": "done",
+      "rationale": "Old prompt said never-commit which conflicts with new auto-commit; clarify guardrail",
+      "risk": "low",
+      "outcome": "Replaced never-commit line in IMPROVE_SYSTEM_PROMPT with explicit instruction not to commit manually since harness handles it"
     }
   ]
 }
