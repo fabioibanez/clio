@@ -1,0 +1,52 @@
+{
+  "backlog": [
+    {
+      "id": "validation-failure-retry",
+      "title": "Inject fix-it prompt on validation failure",
+      "status": "planned",
+      "rationale": "Already scaffolded in _validation_followup; ensures the agent fixes broken code before moving on",
+      "risk": "low"
+    },
+    {
+      "id": "rich-commit-message",
+      "title": "Include git diff summary in auto-commit message body",
+      "status": "planned",
+      "rationale": "Richer commit history – easier to review what each iteration changed",
+      "risk": "low"
+    }
+  ],
+  "done": [
+    {
+      "id": "truncate-tool-output",
+      "title": "Truncate long bash tool output",
+      "status": "done",
+      "rationale": "Unbounded stdout/stderr can blow up context window",
+      "risk": "low",
+      "outcome": "Added MAX_OUTPUT_CHARS=8000 cap with truncation notice in tools.py"
+    },
+    {
+      "id": "conversation-history-trim",
+      "title": "Trim old chat messages to stay within token budget",
+      "status": "done",
+      "rationale": "Long chat sessions accumulate messages; dropping oldest pairs prevents context-window overflow",
+      "risk": "low",
+      "outcome": "Added _trim_messages() + MAX_CHAT_MESSAGES=40 in clio.py; called after every chat turn"
+    },
+    {
+      "id": "streaming-output",
+      "title": "Stream assistant text tokens as they arrive",
+      "status": "done",
+      "rationale": "Users see nothing until full response arrives; streaming prints tokens live",
+      "risk": "medium",
+      "outcome": "_turn() now uses client.messages.stream(); text deltas printed with ANSI colour as they arrive; tool-use rounds handled the same way via get_final_message()"
+    },
+    {
+      "id": "agent-branch-autocommit",
+      "title": "Auto-commit each validated improvement to 'agent' branch",
+      "status": "done",
+      "rationale": "User requested every improvement be committed to an 'agent' branch; provides clear history",
+      "risk": "low",
+      "outcome": "Added AGENT_BRANCH constant, _auto_commit(iteration) helper, and wired it into _validation_followup(); also added failure-hint injection on non-zero exit"
+    }
+  ]
+}

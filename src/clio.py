@@ -43,6 +43,15 @@ VALIDATION_COMMAND = (
     "&& git diff -- src pyproject.toml README.md clio_capabilities.json"
 )
 
+# Branch where every validated self-improvement iteration is committed.
+AGENT_BRANCH = "agent"
+
+# Maximum number of messages to keep in the rolling chat history.
+# Each full exchange is 2 messages (user + assistant); tool round-trips add
+# more.  Keeping the 40 most recent messages gives ~20 full turns of context
+# without risking a context-window overflow.
+MAX_CHAT_MESSAGES = 40
+
 
 class Clio:
     def __init__(self) -> None:
@@ -72,6 +81,7 @@ class Clio:
 
             self.messages.append({"role": "user", "content": line})
             self._turn(self.messages, CHAT_SYSTEM_PROMPT, CHAT_MODEL)
+            _trim_messages(self.messages, MAX_CHAT_MESSAGES)
 
     def improve(self, focus: str | None = None, max_iters: int = 3) -> None:
         focus_text = focus or "choose the most useful next capability yourself"
@@ -101,7 +111,7 @@ class Clio:
                     IMPROVE_MODEL,
                     max_tokens=4096,
                 )
-                messages.append(_validation_followup())
+                messages.append(_validation_followup(iteration))
         except KeyboardInterrupt:
             print("\n\nSelf-improvement stopped.")
             return
@@ -115,23 +125,50 @@ class Clio:
         model: str,
         max_tokens: int = 1024,
     ) -> None:
-        """Run one agent turn, looping until the model stops requesting tools."""
+        """Run one agent turn, looping until the model stops requesting tools.
+
+        Text responses are streamed token-by-token for immediate feedback.
+        Tool-use rounds also stream, but only text deltas are printed live;
+        the final message is used to dispatch tool calls as usual.
+        """
         while True:
-            response = self.client.messages.create(
+            with self.client.messages.stream(
                 model=model,
                 max_tokens=max_tokens,
                 system=system,
                 messages=messages,
                 tools=TOOLS,
-            )
+            ) as stream:
+                printed_any = False
+                for text_delta in stream.text_stream:
+                    print(f"{ASSISTANT_COLOR}{text_delta}{RESET}", end="", flush=True)
+                    printed_any = True
+                if printed_any:
+                    print()  # newline after streamed text
+                response = stream.get_final_message()
+
             messages.append({"role": "assistant", "content": response.content})
 
             tool_uses = [b for b in response.content if b.type == "tool_use"]
             if not tool_uses:
-                _print_assistant_text(response)
                 return
 
             messages.append({"role": "user", "content": _run_tool_calls(tool_uses)})
+
+
+def _trim_messages(messages: list[dict], max_messages: int) -> None:
+    """Drop the oldest messages when the list exceeds *max_messages*.
+
+    Messages are always dropped in pairs (user + assistant) from the front so
+    the list stays structurally valid (starts with a user message, alternates
+    roles).  At least 2 messages are always preserved.
+    """
+    floor = max(max_messages, 2)
+    while len(messages) > floor:
+        # Remove the two oldest messages as a pair.
+        messages.pop(0)
+        if len(messages) > floor:
+            messages.pop(0)
 
 
 def _run_tool_calls(tool_uses) -> list[dict]:
@@ -158,9 +195,23 @@ def _print_assistant_text(response) -> None:
         print(f"{ASSISTANT_COLOR}{text}{RESET}")
 
 
-def _validation_followup() -> dict:
+def _validation_followup(iteration: int = 0) -> dict:
     result = tools.call_tool({"command": VALIDATION_COMMAND, "timeout": 30})
-    print(f"{ASSISTANT_COLOR}Validation exit code: {result['exit_code']}{RESET}")
+    exit_code = result["exit_code"]
+    print(f"{ASSISTANT_COLOR}Validation exit code: {exit_code}{RESET}")
+
+    if exit_code == 0:
+        _auto_commit(iteration)
+
+    extra = (
+        ""
+        if exit_code == 0
+        else (
+            "\n\nThe validation FAILED (non-zero exit code). "
+            "Please inspect the error above, fix the issue, and re-validate "
+            "before moving on."
+        )
+    )
     return {
         "role": "user",
         "content": (
@@ -169,8 +220,44 @@ def _validation_followup() -> dict:
             "If the change is complete and validated, record the outcome in "
             "clio_capabilities.json using bash. Then continue with the next "
             "most useful capability unless the iteration budget is done."
+            + extra
         ),
     }
+
+
+def _auto_commit(iteration: int) -> None:
+    """Stage all tracked modified files + clio_capabilities.json and commit to AGENT_BRANCH."""
+    # Ensure we are on the agent branch (switch if needed, stashing nothing – we just commit)
+    branch_result = tools.call_tool({"command": "git rev-parse --abbrev-ref HEAD", "timeout": 10})
+    current_branch = branch_result.get("stdout", "").strip()
+
+    if current_branch != AGENT_BRANCH:
+        switch = tools.call_tool(
+            {"command": f"git checkout {AGENT_BRANCH} 2>&1 || git checkout -b {AGENT_BRANCH} 2>&1", "timeout": 10}
+        )
+        if switch.get("exit_code") != 0:
+            print(f"{ASSISTANT_COLOR}[auto-commit] Could not switch to {AGENT_BRANCH}: {switch.get('stderr', '')}{RESET}")
+            return
+
+    stage = tools.call_tool(
+        {"command": "git add src/clio.py src/tools.py src/prompts.py pyproject.toml README.md clio_capabilities.json 2>&1", "timeout": 10}
+    )
+    if stage.get("exit_code") != 0:
+        print(f"{ASSISTANT_COLOR}[auto-commit] git add failed: {stage.get('stderr', '')}{RESET}")
+        return
+
+    # Check if there is anything to commit
+    status = tools.call_tool({"command": "git diff --cached --stat", "timeout": 10})
+    if not status.get("stdout", "").strip():
+        print(f"{ASSISTANT_COLOR}[auto-commit] Nothing staged – skipping commit for iteration {iteration}.{RESET}")
+        return
+
+    msg = f"feat(agent): self-improvement iteration {iteration}"
+    commit = tools.call_tool({"command": f'git commit -m "{msg}" 2>&1', "timeout": 15})
+    if commit.get("exit_code") == 0:
+        print(f"{ASSISTANT_COLOR}[auto-commit] Committed iteration {iteration} to branch '{AGENT_BRANCH}'.{RESET}")
+    else:
+        print(f"{ASSISTANT_COLOR}[auto-commit] Commit failed: {commit.get('stdout', '')} {commit.get('stderr', '')}{RESET}")
 
 
 def main() -> None:
