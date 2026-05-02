@@ -1,13 +1,5 @@
 {
-  "backlog": [
-    {
-      "id": "validation-failure-retry",
-      "title": "Inject fix-it prompt on validation failure",
-      "status": "planned",
-      "rationale": "Already scaffolded in _validation_followup; ensures the agent fixes broken code before moving on",
-      "risk": "low"
-    }
-  ],
+  "backlog": [],
   "done": [
     {
       "id": "truncate-tool-output",
@@ -72,6 +64,14 @@
       "rationale": "User requested push to branch; _auto_commit only committed locally without pushing",
       "risk": "low",
       "outcome": "Added git push origin AGENT_BRANCH call inside _auto_commit() after every successful commit; prints push status"
+    },
+    {
+      "id": "validation-failure-retry",
+      "title": "Retry loop on validation failure \u2014 inject fix-it turn",
+      "status": "done",
+      "rationale": "When py_compile/diff fails the agent needs extra turns to repair before moving on",
+      "risk": "low",
+      "outcome": "Added MAX_VALIDATION_RETRIES=2 constant; improve() now loops up to 2 extra repair turns when _is_validation_ok() detects failure in the followup message. _is_validation_ok() helper checks for FAILED sentinel in message content."
     }
   ]
 }

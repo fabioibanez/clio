@@ -53,6 +53,10 @@ AGENT_BRANCH = "agent"
 # without risking a context-window overflow.
 MAX_CHAT_MESSAGES = 40
 
+# Maximum times _auto_commit will retry after a validation failure before
+# giving up and moving on to the next iteration.
+MAX_VALIDATION_RETRIES = 2
+
 
 class Clio:
     def __init__(self) -> None:
@@ -112,7 +116,24 @@ class Clio:
                     IMPROVE_MODEL,
                     max_tokens=4096,
                 )
-                messages.append(_validation_followup(iteration))
+                followup = _validation_followup(iteration)
+                messages.append(followup)
+                # Retry loop: if validation failed give the agent extra turns to fix it.
+                for _retry in range(MAX_VALIDATION_RETRIES):
+                    if _is_validation_ok(followup):
+                        break
+                    print(
+                        f"{ASSISTANT_COLOR}[retry {_retry + 1}/{MAX_VALIDATION_RETRIES}] "
+                        f"Validation failed — giving agent a repair turn.{RESET}"
+                    )
+                    self._turn(
+                        messages,
+                        IMPROVE_SYSTEM_PROMPT,
+                        IMPROVE_MODEL,
+                        max_tokens=4096,
+                    )
+                    followup = _validation_followup(iteration)
+                    messages.append(followup)
         except KeyboardInterrupt:
             print("\n\nSelf-improvement stopped.")
             return
@@ -194,6 +215,16 @@ def _print_assistant_text(response) -> None:
     text = "\n".join(b.text for b in response.content if b.type == "text")
     if text:
         print(f"{ASSISTANT_COLOR}{text}{RESET}")
+
+
+def _is_validation_ok(followup_msg: dict) -> bool:
+    """Return True when a _validation_followup message indicates success.
+
+    We check the content string for absence of the FAILED sentinel so we
+    do not have to thread the raw exit-code through extra call-sites.
+    """
+    content = followup_msg.get("content", "")
+    return "validation FAILED" not in content
 
 
 def _validation_followup(iteration: int = 0) -> dict:
