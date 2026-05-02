@@ -262,6 +262,14 @@ def _auto_commit(iteration: int) -> None:
     commit = tools.call_tool({"command": f"git commit -F /tmp/clio_commit_msg.txt 2>&1", "timeout": 15})
     if commit.get("exit_code") == 0:
         print(f"{ASSISTANT_COLOR}[auto-commit] Committed iteration {iteration} to branch '{AGENT_BRANCH}'.{RESET}")
+        # Push the branch so the remote stays in sync with every validated improvement.
+        push = tools.call_tool(
+            {"command": f"git push origin {AGENT_BRANCH} 2>&1", "timeout": 30}
+        )
+        if push.get("exit_code") == 0:
+            print(f"{ASSISTANT_COLOR}[auto-commit] Pushed branch '{AGENT_BRANCH}' to origin.{RESET}")
+        else:
+            print(f"{ASSISTANT_COLOR}[auto-commit] Push failed: {push.get('stdout', '')} {push.get('stderr', '')}{RESET}")
     else:
         print(f"{ASSISTANT_COLOR}[auto-commit] Commit failed: {commit.get('stdout', '')} {commit.get('stderr', '')}{RESET}")
 

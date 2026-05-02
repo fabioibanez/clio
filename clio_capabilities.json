@@ -64,6 +64,14 @@
       "rationale": "Working tree had uncommitted truncate-tool-output work; staged and committed to keep agent branch clean",
       "risk": "low",
       "outcome": "Committed src/tools.py (MAX_OUTPUT_CHARS + _truncate) to agent branch in chore commit c1adb1c"
+    },
+    {
+      "id": "auto-push-on-commit",
+      "title": "Push to origin after every auto-commit",
+      "status": "done",
+      "rationale": "User requested push to branch; _auto_commit only committed locally without pushing",
+      "risk": "low",
+      "outcome": "Added git push origin AGENT_BRANCH call inside _auto_commit() after every successful commit; prints push status"
     }
   ]
 }
