@@ -1,4 +1,5 @@
 import json
+import pathlib
 import time
 
 import anthropic
@@ -252,8 +253,13 @@ def _auto_commit(iteration: int) -> None:
         print(f"{ASSISTANT_COLOR}[auto-commit] Nothing staged – skipping commit for iteration {iteration}.{RESET}")
         return
 
-    msg = f"feat(agent): self-improvement iteration {iteration}"
-    commit = tools.call_tool({"command": f'git commit -m "{msg}" 2>&1', "timeout": 15})
+    diff_stat = status.get("stdout", "").strip()
+    subject = f"feat(agent): self-improvement iteration {iteration}"
+    body = f"Changed files:\n{diff_stat}"
+    # Write commit message to a temp file (avoids shell-quoting issues with multiline text)
+    msg_file = pathlib.Path("/tmp/clio_commit_msg.txt")
+    msg_file.write_text(f"{subject}\n\n{body}\n")
+    commit = tools.call_tool({"command": f"git commit -F /tmp/clio_commit_msg.txt 2>&1", "timeout": 15})
     if commit.get("exit_code") == 0:
         print(f"{ASSISTANT_COLOR}[auto-commit] Committed iteration {iteration} to branch '{AGENT_BRANCH}'.{RESET}")
     else:

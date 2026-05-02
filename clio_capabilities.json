@@ -6,13 +6,6 @@
       "status": "planned",
       "rationale": "Already scaffolded in _validation_followup; ensures the agent fixes broken code before moving on",
       "risk": "low"
-    },
-    {
-      "id": "rich-commit-message",
-      "title": "Include git diff summary in auto-commit message body",
-      "status": "planned",
-      "rationale": "Richer commit history – easier to review what each iteration changed",
-      "risk": "low"
     }
   ],
   "done": [
@@ -47,6 +40,14 @@
       "rationale": "User requested every improvement be committed to an 'agent' branch; provides clear history",
       "risk": "low",
       "outcome": "Added AGENT_BRANCH constant, _auto_commit(iteration) helper, and wired it into _validation_followup(); also added failure-hint injection on non-zero exit"
+    },
+    {
+      "id": "rich-commit-message",
+      "title": "Include git diff stat in auto-commit message body",
+      "status": "done",
+      "rationale": "Richer commit history makes it easy to review what each iteration changed",
+      "risk": "low",
+      "outcome": "Added pathlib import; _auto_commit() now writes subject + diff-stat body to /tmp/clio_commit_msg.txt and uses git commit -F"
     }
   ]
 }
